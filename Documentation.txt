@@ -1,0 +1,455 @@
+Modular Recommendation System
+By Arian Madadi
+
+Training data must be dowloaded at: https://www.kaggle.com/competitions/santander-product-recommendation/data
+
+The project is split into 3 main components, which build off other components:
+-	pipeline.py
+-	monitoring.py
+-	dashboard.py
+Before running any of them, the settings.py file must be updated with the correct file path to the training data.
+Pipeline.py and monitoring.py must be run for the dashboard to work.
+Pipeline.py performs a recommendation for the one year window which starts on the date you input (eg. 2015-01 -> 2016-01).
+How it works:
+1.	Import data using Santander.load_data. This is a data loading function that imports and cleans the data. As with all functions and classes, this can be edited to fit whatever needs the application dataset will have.
+2.	Sample the data using Santander.sample_customers. This is because the dataset being used is massive. This step may not be necessary for other datasets.
+3.	Reformat the data into final window format & split it into train, test and validation sets with Santander.prepare_data.
+4.	Split data into X and y with CustomerSimilarity.reformat_all. This is the point at which user-user collaborative filter will be run.
+5.	Select your model between LGBMRank (train_ranking_model) and Logistic Regression (train_logistic_regression_model), and train.
+6.	Using CustomerSimilarity.customers_with_new_products, find a list of customers which have new products the following month (helps to create a list of customers with whom to test recall)
+7.	Test recall with CustomerSimilarity.average_recall.
+
+Monitoring.py performs all the same steps, but adds an incremental window shifter, as well as retraining system. In order to run it:
+1.	Simply run train_and_monitor in the monitoring.py file. By default, the function will use all data available, will use LGBMRank, and will retrain if threshold is not met. 
+This can be changed with the options retrain=0 (To disable retraining) and benchmark=1 (to use logistic regression instead of LGBMRank, and to use only product ownership information in the prediction)
+Dashboard.py opens the dashboard, using the files saved from the previous two components. In order to run it, run the command “streamlit run /FILE/PATH/dashboard.py”
+
+
+
+
+
+
+Analysis.py contains:
+Class Name: Analysis
+Description: The Analysis class provides a set of methods to analyze and process data related to Santander's customers and products.
+Methods:
+________________________________________
+1. analyze_data(pdf)
+Description: Provides a comprehensive analysis of the numerical and categorical columns in the given dataframe. 
+It prints the analysis of missing values, zero rates, mean, variance, quantiles, and other statistics for numerical columns. 
+For categorical columns, it prints the missing rate and the most popular categories. 
+It also provides insights on unique customers per month, new and lost clients per month, and assets per month.
+Parameters:
+•	pdf: DataFrame containing the data to be analyzed.
+Returns:
+•	None. The results are printed directly.
+________________________________________
+2. count_new_lost(curr_month, prev_month)
+Description: Counts the number of new and lost customers between two months.
+Parameters:
+•	curr_month: Set of customers for the current month.
+•	prev_month: Set of customers for the previous month.
+Returns:
+•	Tuple containing counts of new and lost customers.
+________________________________________
+3. final_form(pdf)
+Description: Transforms the dataframe by aggregating certain columns into a dictionary and dropping unnecessary columns. 
+It also prints the transformed dataframe.
+Parameters:
+•	pdf: DataFrame containing the data to be transformed.
+Returns:
+•	Transformed DataFrame.
+________________________________________
+4. statistics(train_pdf, val_pdf, test_pdf)
+Description: Provides statistics on the number of rows, unique customers, 
+duplicated rows, duplicated customers, and common customers across train, validation, and test datasets.
+Parameters:
+•	train_pdf: DataFrame containing the training data.
+•	val_pdf: DataFrame containing the validation data.
+•	test_pdf: DataFrame containing the test data.
+Returns:
+•	Dictionary containing various statistics.
+________________________________________
+5. label_statistic(pdf)
+Description: Calculates and prints the number of customers who have changed products.
+Parameters:
+•	pdf: DataFrame containing the data to be analyzed.
+Returns:
+•	Integer representing the number of customers who changed products.
+________________________________________
+6. final_form_analysis(pdf)
+Description: Analyzes the engineered features in the dataframe, providing statistics on missing values, 
+zero rates, mean, variance, quantiles, and other metrics. The results are printed directly.
+Parameters:
+•	pdf: DataFrame containing the data with engineered features.
+Returns:
+•	None. The results are printed directly.
+ 
+
+
+
+
+
+
+Data_analysis_helper.py contains:
+Class Name: DataAnalysis
+Description: The DataAnalysis class provides utility methods for data preprocessing, 
+specifically for replacing missing or placeholder values in a DataFrame.
+________________________________________
+Methods:
+________________________________________
+1. replace_missing(pdf, cols, missing_vals=None, kwargs)
+Description: Replaces missing or placeholder values in specified columns of a DataFrame with a given value.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	cols: List of column names where missing or placeholder values need to be replaced.
+•	missing_vals: List of values considered as missing or placeholders. Default is ['NA'].
+•	**kwargs: Additional keyword arguments. Currently supports replace_val.
+Keyword Arguments:
+•	replace_val: The value to replace missing or placeholder values with. Default is np.nan.
+Returns:
+•	DataFrame with missing or placeholder values replaced in the specified columns.
+ 
+
+
+
+
+
+
+Santander.py contains:
+
+Class Name: Santander
+Description: The Santander class provides a set of methods to load, preprocess,
+ and prepare data related to Santander's customers and products.
+________________________________________
+Methods:
+________________________________________
+1. load_data(fname)
+Description: Loads data from a given file, preprocesses it by renaming columns, 
+handling missing values, and encoding categorical variables.
+Parameters:
+•	fname: Filename of the data file to be loaded.
+Returns:
+•	Preprocessed DataFrame.
+________________________________________
+2. load_data_dashboard(fname)
+Description: Loads data for the dashboard without any preprocessing other than renaming columns.
+Parameters:
+•	fname: Filename of the data file to be loaded.
+Returns:
+•	DataFrame with renamed columns.
+________________________________________
+3. benchmark(pdf)
+Description: Removes personal information columns from the dataframe.
+Parameters:
+•	pdf: DataFrame containing the data to be processed.
+Returns:
+•	DataFrame without personal information columns.
+________________________________________
+4. encoder(pdf)
+Description: Encodes categorical columns using one-hot encoding.
+Parameters:
+•	pdf: DataFrame containing the data to be encoded.
+Returns:
+•	DataFrame with one-hot encoded columns.
+________________________________________
+5. sample_customers(pdf, split=0.001, state=2023)
+Description: Samples a subset of unique customers from the dataframe.
+Parameters:
+•	pdf: DataFrame containing the data to be sampled.
+•	split: Fraction of unique customers to be sampled.
+•	state: Random seed for reproducibility.
+Returns:
+•	Sampled DataFrame.
+________________________________________
+6. reformat(pdf, start_year, month, split=0.2, state=2023)
+Description: Reformats the dataframe by generating new features, merging with label data, 
+and splitting into training, validation, and test sets.
+Parameters:
+•	pdf: DataFrame containing the data to be reformatted.
+•	start_year: Starting year for the data.
+•	month: Starting month for the data.
+•	split: Fraction of data to be used for validation.
+•	state: Random seed for reproducibility.
+Returns:
+•	Tuple containing training, validation, and test DataFrames.
+________________________________________
+7. prepare_data(pdf, start_year, month, split=0.2, state=2023)
+Description: Prepares the data by calling the reformat method and then dropping unnecessary columns.
+Parameters:
+•	pdf: DataFrame containing the data to be prepared.
+•	start_year: Starting year for the data.
+•	month: Starting month for the data.
+•	split: Fraction of data to be used for validation.
+•	state: Random seed for reproducibility.
+Returns:
+•	Tuple containing prepared training, validation, and test DataFrames.
+ 
+
+
+
+
+
+
+
+
+Feature_engineering.py contains:
+
+Class Name: Features
+Description: The Features class provides a set of methods to engineer 
+and extract features from the Santander's customers and products data.
+________________________________________
+Methods:
+________________________________________
+1. num_prod(pdf)
+Description: Calculates the total number of products for each customer and month.
+Parameters:
+•	pdf: DataFrame containing the data.
+Returns:
+•	DataFrame with an additional column product_count indicating the total number of products for each customer and month.
+________________________________________
+2. cust_sen(pdf)
+Description: Calculates the ratio of products to customer seniority.
+Parameters:
+•	pdf: DataFrame containing the data.
+Returns:
+•	DataFrame with an additional column products_divided_seniority indicating the ratio of products to customer seniority.
+________________________________________
+3. customer_activity(pdf, lookback)
+Description: Calculates the customer activity in terms of new products acquired over a specified lookback period.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	lookback: Number of months to look back for activity.
+Returns:
+•	DataFrame with an additional column indicating the customer activity over the lookback period.
+________________________________________
+4. dropped_products(pdf, lookback)
+Description: Calculates the number of products dropped by a customer over a specified lookback period.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	lookback: Number of months to look back for dropped products.
+Returns:
+•	DataFrame with an additional column indicating the number of products dropped over the lookback period.
+________________________________________
+5. customer_product_stability(pdf, lookback)
+Description: Calculates a stability score ratio for customer products over a specified lookback period.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	lookback: Number of months to look back for stability score.
+Returns:
+•	DataFrame with an additional column indicating the product stability score ratio over the lookback period.
+________________________________________
+6. avg_customer_seniority(pdf)
+Description: Calculates the average customer seniority for each product.
+Parameters:
+•	pdf: DataFrame containing the data.
+Returns:
+•	DataFrame with additional columns indicating the average customer seniority for each product.
+________________________________________
+7. num_customers(pdf)
+Description: Calculates the number of customers for each product.
+Parameters:
+•	pdf: DataFrame containing the data.
+Returns:
+•	DataFrame with additional columns indicating the number of customers for each product.
+________________________________________
+8. avg_age(pdf)
+Description: Calculates the average age of customers for each product.
+Parameters:
+•	pdf: DataFrame containing the data.
+Returns:
+•	DataFrame with additional columns indicating the average age of customers for each product.
+
+
+
+
+
+
+Feature_engineering_helper.py contains:
+
+Class Name: FeatureHelper
+Description: The FeatureHelper class provides utility methods to assist in feature engineering tasks, 
+particularly for calculating differences, new products, dropped products, and various aggregate metrics.
+________________________________________
+Methods:
+________________________________________
+1. calc_product_diff(pdf, product_cols, lookback)
+Description: Calculates the difference in product values over a specified lookback period.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	product_cols: List of product columns to calculate the difference for.
+•	lookback: Number of months to look back for calculating the difference.
+Returns:
+•	DataFrame with additional columns indicating the difference in product values over the lookback period.
+________________________________________
+2. calc_new_products(pdf, product_cols)
+Description: Calculates the number of new products acquired by a customer.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	product_cols: List of product columns to calculate the number of new products for.
+Returns:
+•	DataFrame with an additional column num_new_products indicating the number of new products acquired by a customer.
+________________________________________
+3. calc_dropped_products(pdf, product_cols, lookback)
+Description: Calculates the number of products dropped by a customer over a specified lookback period.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	product_cols: List of product columns to calculate the number of dropped products for.
+•	lookback: Number of months to look back for calculating the dropped products.
+Returns:
+•	DataFrame with additional columns indicating the number of products dropped over the lookback period.
+________________________________________
+4. calc_product_stability(pdf, product_cols, lookback, num_products)
+Description: Calculates a stability score for customer products over a specified lookback period.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	product_cols: List of product columns to calculate the stability score for.
+•	lookback: Number of months to look back for stability score.
+•	num_products: Total number of products.
+Returns:
+•	DataFrame with an additional column product_stability_score indicating the product stability score ratio over the lookback period.
+________________________________________
+5. calc_avg_customer_seniority(pdf, product_cols)
+Description: Calculates the average customer seniority for each product.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	product_cols: List of product columns to calculate the average customer seniority for.
+Returns:
+•	Dictionary with product columns as keys and their corresponding average customer seniority as values.
+________________________________________
+6. calc_num_customers(pdf, product_cols)
+Description: Calculates the number of customers for each product.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	product_cols: List of product columns to calculate the number of customers for.
+Returns:
+•	Dictionary with product columns as keys and their corresponding number of customers as values.
+________________________________________
+7. calc_avg_age(pdf, product_cols)
+Description: Calculates the average age of customers for each product.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	product_cols: List of product columns to calculate the average age for.
+Returns:
+•	Dictionary with product columns as keys and their corresponding average age of customers as values.
+ 
+
+
+
+
+
+
+Model.py contains:
+
+Class Name: CustomerSimilarity
+Description: The CustomerSimilarity class provides methods to compute similarity between 
+customers based on their product ownership, filter out similar customers, recommend products to customers, 
+and evaluate the performance of recommendation models.
+________________________________________
+Attributes:
+•	product_dict: A dictionary mapping indices to product names.
+________________________________________
+Methods:
+________________________________________
+1. similar(pdf, customer_code, users=1000)
+Description: Finds similar users to a given user based on cosine similarity.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	customer_code: The customer code of the target user.
+•	users: Number of similar users to return.
+Returns:
+•	A series of customer codes of similar users.
+________________________________________
+2. filter(pdf, original, candidates)
+Description: Filters out candidates that have the same product ownership as the original user.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	original: The customer code of the original user.
+•	candidates: Series of customer codes of candidate users.
+Returns:
+•	A series of filtered candidate customer codes.
+________________________________________
+3. recommend_products(pdf, customer_code)
+Description: Recommends products to a user based on the mean product vector of similar users.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	customer_code: The customer code of the target user.
+Returns:
+•	A series of recommended products.
+________________________________________
+4. customers_with_new_products(pdf)
+Description: Finds customers who have acquired new products.
+Parameters:
+•	pdf: DataFrame containing the data.
+Returns:
+•	A list of customer codes of customers who have acquired new products.
+________________________________________
+5. sanitize_column_names(pdf)
+Description: Sanitizes column names by removing special characters.
+Parameters:
+•	pdf: DataFrame containing the data.
+Returns:
+•	DataFrame with sanitized column names.
+________________________________________
+6. reformat(pdf, customer_code, prediction_scores, query_id)
+Description: Reformats the data for a given customer into a binary matrix and target vector.
+Parameters:
+•	pdf: DataFrame containing the data.
+•	customer_code: The customer code of the target user.
+•	prediction_scores: Dictionary of prediction scores for products.
+•	query_id: Query ID for the current customer.
+Returns:
+•	Binary matrix and target vector for the given customer.
+________________________________________
+7. reformat_all(pdf)
+Description: Reformats the data for all customers into a binary matrix and target vector.
+Parameters:
+•	pdf: DataFrame containing the data.
+Returns:
+•	Binary matrix and target vector for all customers.
+________________________________________
+8. train_ranking_model(X_train, y_train)
+Description: Trains a ranking model using LightGBM.
+Parameters:
+•	X_train: Training data.
+•	y_train: Target variable.
+Returns:
+•	Trained LGBMRanker model.
+________________________________________
+9. train_logistic_regression_model(X_train, y_train)
+Description: Trains a logistic regression model.
+Parameters:
+•	X_train: Training data.
+•	y_train: Target variable.
+Returns:
+•	Trained LogisticRegression model.
+________________________________________
+10. make_predictions(model, X, customer_code, top_n=5)
+Description: Makes product recommendations for a given customer.
+Parameters:
+•	model: Trained model.
+•	X: Data.
+•	customer_code: The customer code of the target user.
+•	top_n: Number of top products to recommend.
+Returns:
+•	DataFrame containing top recommended products and their prediction scores.
+________________________________________
+11. evaluate_all_customers(model, X, y)
+Description: Evaluates the performance of the recommendation model for all customers.
+Parameters:
+•	model: Trained model.
+•	X: Data.
+•	y: Target variable.
+Returns:
+•	DataFrame containing evaluation metrics for all customers.
+________________________________________
+12. average_recall(model, X, y, customers, top_n=5)
+Description: Computes the average recall of the recommendation model for a set of customers.
+Parameters:
+•	model: Trained model.
+•	X: Data.
+•	y: Target variable.
+•	customers: List of customer codes.
+•	top_n: Number of top products to consider.
+Returns:
+•	Average recall value.
